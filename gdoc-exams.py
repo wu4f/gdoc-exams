@@ -1,6 +1,7 @@
 from googleapiclient import discovery
 from httplib2 import Http
 from oauth2client import file, client, tools
+from time import sleep
 
 def get_drive_client():
     SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/drive.file','https://www.googleapis.com/auth/drive.appdata']
@@ -19,29 +20,50 @@ def make_copy_in_drive(DRIVE, exam_googledoc_id, student_email, student_name):
     drive_response = DRIVE.files().copy(fileId=exam_googledoc_id, body=body).execute()
     exam_copy_id = drive_response.get('id')
 
-    batch = DRIVE.new_batch_http_request()
     user_permission = {
         'type': 'user',
         'role': 'writer',
         'emailAddress': student_email
     }
-    batch.add(DRIVE.permissions().create(
+
+    drive_response = DRIVE.permissions().create(
             fileId=exam_copy_id,
             body=user_permission,
             fields='id',
-    ))
-    batch.execute()
-    return exam_copy_id
+    ).execute()
+    permission_id = drive_response.get('id')
+    return exam_copy_id, permission_id
 
+def remove_permissions(DRIVE, copyId, permissionId):
+    DRIVE.permissions().delete(
+            fileId=copyId,
+            permissionId=permissionId
+    ).execute()
+
+
+# Must be replaced with your student's e-mail addresses and names
 students = {
     'cyberdiscoverypdxvol@gmail.com' : 'CyberDiscovery PDX',
     'pwnlandiactf@gmail.com' : 'Pwnlandia CTF'
 }
 
+# Must be replaced with the Google Doc ID of your exam
 exam_googledoc_id = '1hCCQz7BnaF6JO8BtIyLyFEZpSsRaycJjTS0S75V4YZs'
 
-DRIVE = get_drive_client()
+# Must be replaced with the duration of your exam (in seconds)
+duration = 60
 
+DRIVE = get_drive_client()
+permissions = dict()
 for student in students:
-    copy_id = make_copy_in_drive(DRIVE, exam_googledoc_id, student, students[student])
-    print(f'copy: {copy_id}  student email: {student}  student name:{students[student]}')
+    copyId, permissionId = make_copy_in_drive(DRIVE, exam_googledoc_id, student, students[student])
+    print(f'Exam copy {copyId}  Permission {permissionId}  Student {student}, Student name {students[student]}')
+    permissions[copyId] = permissionId
+
+for cnt in range(duration,-1, -1):
+    print(f'Seconds left: {cnt}   \r', end='')
+    sleep(1)
+
+for id in permissions:
+    print(f'Removing permission {permissions[id]} on copyId {id}')
+    remove_permissions(DRIVE,id,permissions[id])
