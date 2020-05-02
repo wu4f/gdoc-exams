@@ -2,6 +2,7 @@ from googleapiclient import discovery
 from httplib2 import Http
 from oauth2client import file, client, tools
 from time import sleep
+import json
 
 def get_drive_client():
     SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/drive.file','https://www.googleapis.com/auth/drive.appdata']
@@ -51,19 +52,26 @@ students = {
 exam_googledoc_id = '1hCCQz7BnaF6JO8BtIyLyFEZpSsRaycJjTS0S75V4YZs'
 
 # Must be replaced with the duration of your exam (in seconds)
-duration = 60
+#   A duration of 0 will skip the revocation of permissions.  You may
+#   may then save the permissionIds that are output for subsequent
+#   deletion programatically (or do things manually via the web)   
+duration = 0
 
 DRIVE = get_drive_client()
 permissions = dict()
 for student in students:
     copyId, permissionId = make_copy_in_drive(DRIVE, exam_googledoc_id, student, students[student])
-    print(f'Exam copy {copyId}  Permission {permissionId}  Student {student}, Student name {students[student]}')
+    print(f'Copy {copyId}  Permission {permissionId}  Student {student}, Student name {students[student]}')
     permissions[copyId] = permissionId
-
-for cnt in range(duration,-1, -1):
-    print(f'Seconds left: {cnt}   \r', end='')
     sleep(1)
 
-for id in permissions:
-    print(f'Removing permission {permissions[id]} on copyId {id}')
-    remove_permissions(DRIVE,id,permissions[id])
+if duration > 0:
+    for cnt in range(duration,-1, -1):
+        print(f'Seconds left: {cnt}   \r', end='')
+        sleep(1)
+
+    for id in permissions:
+        print(f'Removing permission {permissions[id]} on copyId {id}')
+        remove_permissions(DRIVE,id,permissions[id])
+else:
+    print(json.dumps(permissions))
